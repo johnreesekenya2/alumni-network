@@ -20,6 +20,7 @@ import ProfileSetup from './pages/profile-setup';
 import Dashboard from "@/pages/dashboard";
 import Database from "@/pages/database";
 import Community from "@/pages/community";
+import Gallery from "./pages/gallery";
 import UserProfile from './pages/user-profile';
 import Discussion from './pages/discussion';
 import Support from './pages/support'; // Import new Support page
@@ -75,6 +76,7 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/database" component={Database} />
           <Route path="/community" component={Community} />
+          <Route path="/gallery" component={Gallery} />
           <Route path="/profile/:username" component={UserProfile} />
           <Route path="/discussion/:postId" component={Discussion} />
           <Route path="/support" component={Support} />
@@ -92,6 +94,9 @@ function Router() {
             {() => { window.location.href = '/login'; return null; }}
           </Route>
           <Route path="/community">
+            {() => { window.location.href = '/login'; return null; }}
+          </Route>
+          <Route path="/gallery">
             {() => { window.location.href = '/login'; return null; }}
           </Route>
           <Route path="/profile/:username">
