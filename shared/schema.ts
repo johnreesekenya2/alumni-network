@@ -72,6 +72,29 @@ export const feedbacks = pgTable("feedback", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Gallery table for dedicated photo/video uploads
+export const gallery = pgTable("gallery", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: text("title"),
+  description: text("description"),
+  mediaUrl: text("media_url").notNull(),
+  mediaType: varchar("media_type", { length: 20 }).notNull(), // 'image', 'video'
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(), // in bytes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Gallery reactions table
+export const galleryReactions = pgTable("gallery_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  galleryId: varchar("gallery_id").references(() => gallery.id).notNull(),
+  type: varchar("type", { length: 10 }).notNull(), // 'like', 'love', 'dislike'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -80,6 +103,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   comments: many(comments),
   sentMessages: many(messages, { relationName: "sender" }),
   receivedMessages: many(messages, { relationName: "receiver" }),
+  galleryItems: many(gallery),
+  galleryReactions: many(galleryReactions),
 }));
 
 export const postsRelations = relations(posts, ({ one, many }) => ({
@@ -123,6 +148,25 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     fields: [messages.receiverId],
     references: [users.id],
     relationName: "receiver",
+  }),
+}));
+
+export const galleryRelations = relations(gallery, ({ one, many }) => ({
+  user: one(users, {
+    fields: [gallery.userId],
+    references: [users.id],
+  }),
+  reactions: many(galleryReactions),
+}));
+
+export const galleryReactionsRelations = relations(galleryReactions, ({ one }) => ({
+  user: one(users, {
+    fields: [galleryReactions.userId],
+    references: [users.id],
+  }),
+  galleryItem: one(gallery, {
+    fields: [galleryReactions.galleryId],
+    references: [gallery.id],
   }),
 }));
 
@@ -199,6 +243,23 @@ export const insertFeedbackSchema = z.object({
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
+// Gallery schemas
+export const insertGallerySchema = createInsertSchema(gallery).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertGalleryReactionSchema = createInsertSchema(galleryReactions).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+});
+
+export type InsertGallery = z.infer<typeof insertGallerySchema>;
+export type InsertGalleryReaction = z.infer<typeof insertGalleryReactionSchema>;
+
 // User type based on the users table
 export type User = {
   id: string;
@@ -237,5 +298,20 @@ export interface Feedback {
   };
 }
 
-// Export types for better organization
-export type { User, InsertUser, Post, InsertPost, Reaction, InsertReaction, Comment, InsertComment, InsertMessage, InsertFeedback };
+// Type definitions for better organization
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
+export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
+export type VerificationData = z.infer<typeof verificationSchema>;
+export type ProfileSetupData = z.infer<typeof profileSetupSchema>;
+export type InsertPost = z.infer<typeof insertPostSchema>;
+export type InsertReaction = z.infer<typeof insertReactionSchema>;
+
+// Additional inferred types from tables
+export type Post = typeof posts.$inferSelect;
+export type Reaction = typeof reactions.$inferSelect;
+export type Comment = typeof comments.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type Gallery = typeof gallery.$inferSelect;
+export type GalleryReaction = typeof galleryReactions.$inferSelect;
