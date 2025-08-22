@@ -1,4 +1,4 @@
-import { Home, Users, MessageCircle, GraduationCap, LogOut, HelpCircle, Info, Award, Inbox, Briefcase } from 'lucide-react';
+import { Home, Users, MessageCircle, GraduationCap, LogOut, HelpCircle, Info, Award, Inbox, Briefcase, Camera } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { authService } from '@/lib/auth';
 import { useState, useEffect } from 'react';
@@ -41,6 +41,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: MessageCircle, 
       path: '/community',
       isActive: location === '/community'
+    },
+    { 
+      label: 'Gallery', 
+      icon: Camera, 
+      path: '/gallery',
+      isActive: location === '/gallery'
     },
     { 
       label: 'Inbox', 
