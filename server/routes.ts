@@ -15,7 +15,9 @@ import {
   insertReactionSchema,
   insertCommentSchema,
   insertFeedbackSchema,
-  insertMessageSchema
+  insertMessageSchema,
+  insertGallerySchema,
+  insertGalleryReactionSchema
 } from "@shared/schema";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./services/email";
 import { upload, getFileUrl } from "./services/upload";
@@ -571,6 +573,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Get conversations error:', error);
       res.status(400).json({ message: error.message || 'Failed to get conversations' });
+    }
+  });
+
+  // Gallery routes
+  app.get('/api/gallery', authenticateToken, async (req: Request & { user?: any }, res: Response) => {
+    try {
+      const galleryItems = await storage.getGalleryItems();
+      res.json(galleryItems);
+    } catch (error: any) {
+      console.error('Get gallery error:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch gallery items' });
+    }
+  });
+
+  app.post('/api/gallery/upload', authenticateToken, upload.single('file'), async (req: Request & { user?: any }, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      // Check file size (10MB limit)
+      if (req.file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: 'File size must be less than 10MB' });
+      }
+
+      // Determine media type
+      const mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video';
+
+      // Validate media type
+      if (!req.file.mimetype.startsWith('image/') && !req.file.mimetype.startsWith('video/')) {
+        return res.status(400).json({ message: 'Only images and videos are allowed' });
+      }
+
+      const galleryData = {
+        title: req.body.title || null,
+        description: req.body.description || null,
+        mediaUrl: getFileUrl(req.file.filename),
+        mediaType,
+        fileName: req.file.filename,
+        fileSize: req.file.size,
+        userId: req.user.userId,
+      };
+
+      const galleryItem = await storage.createGalleryItem(galleryData);
+
+      // Get the created item with user data
+      const galleryItems = await storage.getGalleryItems();
+      const createdItem = galleryItems.find(item => item.id === galleryItem.id);
+
+      res.status(201).json(createdItem);
+    } catch (error: any) {
+      console.error('Gallery upload error:', error);
+      res.status(400).json({ message: error.message || 'Upload failed' });
+    }
+  });
+
+  app.post('/api/gallery/react', authenticateToken, async (req: Request & { user?: any }, res: Response) => {
+    try {
+      const { galleryId, type } = req.body;
+
+      if (!['like', 'love', 'dislike'].includes(type)) {
+        return res.status(400).json({ message: 'Invalid reaction type' });
+      }
+
+      await storage.addGalleryReaction({
+        galleryId,
+        type,
+        userId: req.user.userId,
+      });
+
+      // Get updated gallery item with reactions
+      const galleryItems = await storage.getGalleryItems();
+      const updatedItem = galleryItems.find(item => item.id === galleryId);
+
+      res.json(updatedItem);
+    } catch (error: any) {
+      console.error('Gallery reaction error:', error);
+      res.status(400).json({ message: error.message || 'Failed to add reaction' });
     }
   });
 
