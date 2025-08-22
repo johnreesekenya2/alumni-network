@@ -1,4 +1,26 @@
-import { users, posts, reactions, comments, messages, feedbacks, type User, type InsertUser, type Post, type InsertPost, type Reaction, type InsertReaction, type Comment, type InsertComment, type InsertMessage } from "@shared/schema";
+import { 
+  users, 
+  posts, 
+  reactions, 
+  comments, 
+  messages, 
+  feedbacks,
+  gallery,
+  galleryReactions,
+  type User, 
+  type InsertUser, 
+  type Post, 
+  type InsertPost, 
+  type Reaction, 
+  type InsertReaction, 
+  type Comment, 
+  type InsertComment, 
+  type InsertMessage,
+  type Gallery,
+  type InsertGallery,
+  type GalleryReaction,
+  type InsertGalleryReaction
+} from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, or, like, and, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -40,6 +62,12 @@ export interface IStorage {
   createMessage(message: InsertMessage & { senderId: string }): Promise<any>;
   getMessages(userId1: string, userId2: string): Promise<any[]>;
   getConversations(userId: string): Promise<any[]>;
+
+  // Gallery methods
+  createGalleryItem(galleryData: InsertGallery & { userId: string }): Promise<Gallery>;
+  getGalleryItems(): Promise<(Gallery & { user: User; reactions: GalleryReaction[]; userReaction?: GalleryReaction })[]>;
+  addGalleryReaction(reaction: InsertGalleryReaction & { userId: string }): Promise<GalleryReaction>;
+  removeGalleryReaction(userId: string, galleryId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -495,6 +523,91 @@ export class DatabaseStorage implements IStorage {
     });
 
     return conversations;
+  }
+
+  // Gallery methods
+  async createGalleryItem(galleryData: InsertGallery & { userId: string }): Promise<Gallery> {
+    const [galleryItem] = await db
+      .insert(gallery)
+      .values({
+        ...galleryData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    
+    return galleryItem;
+  }
+
+  async getGalleryItems(): Promise<(Gallery & { user: User; reactions: GalleryReaction[]; userReaction?: GalleryReaction })[]> {
+    // Get all gallery items with user data
+    const galleryItems = await db
+      .select({
+        id: gallery.id,
+        userId: gallery.userId,
+        title: gallery.title,
+        description: gallery.description,
+        mediaUrl: gallery.mediaUrl,
+        mediaType: gallery.mediaType,
+        fileName: gallery.fileName,
+        fileSize: gallery.fileSize,
+        createdAt: gallery.createdAt,
+        updatedAt: gallery.updatedAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          username: users.username,
+          profilePicture: users.profilePicture,
+        },
+      })
+      .from(gallery)
+      .leftJoin(users, eq(gallery.userId, users.id))
+      .orderBy(desc(gallery.createdAt));
+
+    // Get reactions for all gallery items
+    const allReactions = await db
+      .select()
+      .from(galleryReactions);
+
+    // Combine data
+    return galleryItems.map(item => ({
+      ...item,
+      reactions: allReactions.filter(r => r.galleryId === item.id),
+    }));
+  }
+
+  async addGalleryReaction(reactionData: InsertGalleryReaction & { userId: string }): Promise<GalleryReaction> {
+    // Remove existing reaction from this user for this gallery item
+    await db
+      .delete(galleryReactions)
+      .where(
+        and(
+          eq(galleryReactions.userId, reactionData.userId),
+          eq(galleryReactions.galleryId, reactionData.galleryId)
+        )
+      );
+
+    // Add new reaction
+    const [reaction] = await db
+      .insert(galleryReactions)
+      .values(reactionData)
+      .returning();
+
+    return reaction;
+  }
+
+  async removeGalleryReaction(userId: string, galleryId: string): Promise<boolean> {
+    const result = await db
+      .delete(galleryReactions)
+      .where(
+        and(
+          eq(galleryReactions.userId, userId),
+          eq(galleryReactions.galleryId, galleryId)
+        )
+      )
+      .returning();
+
+    return result.length > 0;
   }
 }
 
