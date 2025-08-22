@@ -42,11 +42,14 @@ class AuthService {
           };
           // Trigger a custom event to notify components
           window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: this.state }));
-        } else {
+        } else if (response.status === 401 || response.status === 403) {
+          // Only logout on authentication errors, not server errors
           this.logout();
         }
-      } catch {
-        this.logout();
+        // For other errors (500, network issues), keep user logged in
+      } catch (error) {
+        // Network errors - keep user logged in, they'll be checked again later
+        console.warn('Auth check failed due to network error, keeping user logged in:', error);
       }
     }
   }
